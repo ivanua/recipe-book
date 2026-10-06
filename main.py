@@ -5,8 +5,17 @@ from db import connection
 class Recipe(BaseModel):
     name: str
     description: str | None = None
+    category: str 
     
 app = FastAPI()
+
+#HELPER FUNCTIONS
+def format_recipes(recipes):
+    result = [] 
+    for recipe in recipes:
+        recipe_dict = {"id": recipe[0], "name": recipe[1], "description": recipe[2], "category": recipe[3]}
+        result.append(recipe_dict)
+    return result
 
 @app.get("/")
 def root():
@@ -17,10 +26,10 @@ async def create_recipe(recipe: Recipe):
     cursor = connection.cursor()
 
     cursor.execute(
-        "INSERT INTO recipes(name, description) "
-        "VALUES(%s, %s) "
+        "INSERT INTO recipes(name, description, category) "
+        "VALUES(%s, %s, %s) "
         "RETURNING id",
-        (recipe.name, recipe.description)
+        (recipe.name, recipe.description, recipe.category)
     )
     recipe_id = cursor.fetchone()[0]
     connection.commit()
@@ -28,7 +37,9 @@ async def create_recipe(recipe: Recipe):
     return {
         "id": recipe_id,
         "name": recipe.name,
-        "description": recipe.description
+        "description": recipe.description,
+        "category": recipe.category
+
     }
 
 @app.get("/recipe/{id}")
@@ -49,5 +60,30 @@ def recipe(id: int):
     return{
         "id": recipe[0],
         "name": recipe[1],
-        "description": recipe[2]
+        "description": recipe[2],
+        "category": recipe[3]
     }
+
+@app.get("/recipes/")
+def get_recipes(category: str | None = None):
+    if category is None:
+        cursor = connection.cursor()
+
+        cursor.execute(
+            "SELECT * " 
+            "FROM recipes "
+            "ORDER BY id"
+        )
+        recipes = cursor.fetchall()
+        return format_recipes(recipes)
+    else:
+        cursor = connection.cursor()
+
+        cursor.execute(
+            "SELECT * "
+            "FROM recipes "
+            "WHERE category = %s",
+            (category,)
+        )
+        recipes = cursor.fetchall()
+        return format_recipes(recipes)
