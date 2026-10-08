@@ -65,8 +65,35 @@ def recipe(id: int):
     }
 
 @app.get("/recipes/")
-def get_recipes(category: str | None = None):
-    if category is None:
+def get_recipes(
+    category: str | None = None,
+    search: str | None = None
+    ):
+    if category is not None:
+            cursor = connection.cursor()
+    
+            cursor.execute(
+                "SELECT * "
+                "FROM recipes "
+                "WHERE category = %s",
+                (category,)
+            )
+            recipes = cursor.fetchall()
+            return format_recipes(recipes)
+    elif search is not None:
+        search_word = search
+        search_pattern = f"%{search_word}%"
+        cursor = connection.cursor()
+
+        cursor.execute(
+            "SELECT * "
+            "FROM recipes "
+            "WHERE name ILIKE %s",
+            (search_pattern,)
+        )
+        recipes = cursor.fetchall()
+        return format_recipes(recipes)
+    else:
         cursor = connection.cursor()
 
         cursor.execute(
@@ -76,14 +103,4 @@ def get_recipes(category: str | None = None):
         )
         recipes = cursor.fetchall()
         return format_recipes(recipes)
-    else:
-        cursor = connection.cursor()
-
-        cursor.execute(
-            "SELECT * "
-            "FROM recipes "
-            "WHERE category = %s",
-            (category,)
-        )
-        recipes = cursor.fetchall()
-        return format_recipes(recipes)
+    
