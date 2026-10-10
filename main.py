@@ -118,3 +118,24 @@ def delete_recipe(id: int):
     else:
         connection.commit()
     return {"message": "Recipe deleted successfully"}
+
+@app.put("/recipe/{id}")
+def change_recipe(id: int, recipe: Recipe):
+    cursor = connection.cursor()
+
+    cursor.execute(
+        "UPDATE recipes "
+        "SET name = %s, description = %s, category = %s "
+        "WHERE id = %s",
+        (recipe.name, recipe.description, recipe.category, id,)
+    )
+    if cursor.rowcount == 0:
+        raise HTTPException(status_code=404, detail="Recipe not found")
+    else:
+        connection.commit()
+    return {
+        "id": id,
+        "name": recipe.name,
+        "description": recipe.description,
+        "category": recipe.category
+    }
