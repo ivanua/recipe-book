@@ -103,4 +103,18 @@ def get_recipes(
         )
         recipes = cursor.fetchall()
         return format_recipes(recipes)
-    
+
+@app.delete("/recipe/{id}")
+def delete_recipe(id: int):
+    cursor = connection.cursor()
+
+    cursor.execute(
+        "DELETE FROM recipes "
+        "WHERE id = %s",
+        (id,)
+    )
+    if cursor.rowcount == 0:
+        raise HTTPException(status_code=404, detail="Recipe not found")
+    else:
+        connection.commit()
+    return {"message": "Recipe deleted successfully"}
