@@ -67,42 +67,39 @@ def recipe(id: int):
 @app.get("/recipes/")
 def get_recipes(
     category: str | None = None,
-    search: str | None = None
+    search: str | None = None,
+    limit: int | None = None
     ):
-    if category is not None:
-            cursor = connection.cursor()
-    
-            cursor.execute(
-                "SELECT * "
-                "FROM recipes "
-                "WHERE category = %s",
-                (category,)
-            )
-            recipes = cursor.fetchall()
-            return format_recipes(recipes)
-    elif search is not None:
-        search_word = search
-        search_pattern = f"%{search_word}%"
-        cursor = connection.cursor()
+    conditions = []
+    params = []
 
-        cursor.execute(
-            "SELECT * "
-            "FROM recipes "
-            "WHERE name ILIKE %s",
-            (search_pattern,)
-        )
-        recipes = cursor.fetchall()
-        return format_recipes(recipes)
+    if category:
+        conditions.append("category = %s")
+        params.append(category)
+    if search:
+        conditions.append("name ILIKE %s")
+        params.append(f"%{search}%")
+    if limit is not None:
+        if limit < 1:
+            raise HTTPException(
+                status_code=422, detail="You must enter a number greater than zero"
+                )
+        add_limit = " LIMIT %s"
+        params.append(limit)
+    else: 
+        add_limit = ""
+
+    if conditions:
+        where_clause = " WHERE " + " AND ".join(conditions)
     else:
-        cursor = connection.cursor()
+        where_clause = ""
 
-        cursor.execute(
-            "SELECT * " 
-            "FROM recipes "
-            "ORDER BY id"
-        )
-        recipes = cursor.fetchall()
-        return format_recipes(recipes)
+    query = "SELECT * FROM recipes" + where_clause + " ORDER BY id" + add_limit
+
+    cursor = connection.cursor()
+    cursor.execute(query, params)
+    recipes = cursor.fetchall()
+    return format_recipes(recipes)
 
 @app.delete("/recipe/{id}")
 def delete_recipe(id: int):
