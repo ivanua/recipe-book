@@ -1,12 +1,24 @@
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 from db import connection
 
 class Recipe(BaseModel):
-    name: str
+    name: str = Field(min_length=1)
     description: str | None = None
     category: str 
-    
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def validate_name_not_blank(cls, v: any) -> str:
+    # Проверяем, пустая ли строка после удаления пробелов
+        if isinstance(v, str):
+
+            if not v.strip():
+                raise ValueError("Имя не может состоять только из пробелов или быть пустым")
+        else:
+            return v
+    # Возвращаем значение (можно вернуть v.strip(), чтобы автоматически убрать лишние пробелы по краям)
+        return v.strip()
 app = FastAPI()
 
 #HELPER FUNCTIONS
