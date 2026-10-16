@@ -118,7 +118,9 @@ def get_recipes(
     recipes = cursor.fetchall()
     cursor.execute(query_for_count, params_for_count)
     count_recipes = cursor.fetchone()[0]
-    return {"items": format_recipes(recipes), "total": count_recipes}
+    has_next = count_recipes > offset + limit
+    has_prev = offset > 0
+    return {"items": format_recipes(recipes), "total": count_recipes, "has_prev": has_prev, "has_next": has_next}
 
 
 @app.delete("/recipe/{id}")
