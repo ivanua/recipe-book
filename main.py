@@ -83,6 +83,9 @@ def get_recipes(
     limit: int = Query(gt=0,  le=25, default=10),
     offset: int = Query(ge=0, default=0)
     ):
+    
+    if search  is not None:
+        search = search.strip() or None
     conditions = []
     params = []
     params_for_count = []
@@ -117,10 +120,10 @@ def get_recipes(
     cursor.execute(query, params)
     recipes = cursor.fetchall()
     cursor.execute(query_for_count, params_for_count)
-    count_recipes = cursor.fetchone()[0]
-    has_next = count_recipes > offset + limit
-    has_prev = offset > 0
-    return {"items": format_recipes(recipes), "total": count_recipes, "has_prev": has_prev, "has_next": has_next}
+    total = cursor.fetchone()[0]
+    has_next = total > offset + limit
+    has_prev = 0 < offset < total
+    return {"items": format_recipes(recipes), "total": total, "has_prev": has_prev, "has_next": has_next}
 
 
 @app.delete("/recipe/{id}")
