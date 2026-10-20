@@ -1,7 +1,13 @@
 from fastapi import FastAPI, HTTPException, Query
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from db import connection
 from typing import Any
+from pwdlib import PasswordHash
+
+password_hash = PasswordHash.recommended()
+def hash_password(password: str) -> str:
+    return password_hash.hash(password)
+
 class Recipe(BaseModel):
     name: str = Field(min_length=1)
     description: str | None = None
@@ -19,7 +25,22 @@ class Recipe(BaseModel):
             return v
     # Возвращаем значение (можно вернуть v.strip(), чтобы автоматически убрать лишние пробелы по краям)
         return v.strip()
+
+class UserCreate(BaseModel):
+    username: str
+    email: str
+    password: str
+    password_confirm: str
+
+    @model_validator(mode="after")
+    def check_passwords(self):
+        if self.password == self.password_confirm:
+            return self
+        else:
+            raise ValueError("Пароли не совпадают") 
+
 app = FastAPI()
+
 
 #HELPER FUNCTIONS
 def format_recipes(recipes):
@@ -160,4 +181,23 @@ def change_recipe(id: int, recipe: Recipe):
         "name": recipe.name,
         "description": recipe.description,
         "category": recipe.category
+    }
+
+@app.post("/auth/register")
+def create_user(user: UserCreate):
+    hashing_pass = hash_password(user.password)
+
+    cursor = connection.cursor()
+    cursor.execute(
+        "INSERT INTO users (username, email, password_hash ) "
+        "VALUES (%s, %s, %s) "
+        "RETURNING id",
+        (user.username, user.email, hashing_pass,)
+    )
+    user_id = cursor.fetchone()[0]
+    connection.commit()
+    return {
+        "id": user_id,
+        "username": user.username,
+        "email": user.email
     }
