@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException, Query
 from pydantic import BaseModel, Field, field_validator, model_validator
+from psycopg.errors import UniqueViolation
 from db import connection
 from typing import Any
 from pwdlib import PasswordHash
@@ -186,18 +187,21 @@ def change_recipe(id: int, recipe: Recipe):
 @app.post("/auth/register")
 def create_user(user: UserCreate):
     hashing_pass = hash_password(user.password)
-
-    cursor = connection.cursor()
-    cursor.execute(
-        "INSERT INTO users (username, email, password_hash ) "
-        "VALUES (%s, %s, %s) "
-        "RETURNING id",
-        (user.username, user.email, hashing_pass,)
-    )
-    user_id = cursor.fetchone()[0]
-    connection.commit()
-    return {
-        "id": user_id,
-        "username": user.username,
-        "email": user.email
-    }
+    try:
+        cursor = connection.cursor()
+        cursor.execute(
+            "INSERT INTO users (username, email, password_hash ) "
+            "VALUES (%s, %s, %s) "
+            "RETURNING id",
+            (user.username, user.email, hashing_pass,)
+        )
+        user_id = cursor.fetchone()[0]
+        connection.commit()
+        return {
+            "id": user_id,
+            "username": user.username,
+            "email": user.email
+        }
+    except UniqueViolation:
+        connection.rollback()
+        raise HTTPException(status_code=409, detail="username or email already exists")
