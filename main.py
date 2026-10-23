@@ -1,5 +1,5 @@
 from fastapi import FastAPI, HTTPException, Query
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, EmailStr, field_validator, model_validator
 from psycopg.errors import UniqueViolation
 from db import connection
 from typing import Any
@@ -26,12 +26,25 @@ class Recipe(BaseModel):
             return v
     # Возвращаем значение (можно вернуть v.strip(), чтобы автоматически убрать лишние пробелы по краям)
         return v.strip()
-
+message_error = "Password must contain at least one lowercase and one uppercase letters and one digit"
 class UserCreate(BaseModel):
     username: str
-    email: str
+    email: EmailStr
     password: str
     password_confirm: str
+
+    @field_validator("password")
+    @classmethod
+    def check_password(cls, value: str) -> str:
+        if len(value) < 8:
+            raise ValueError("Password must contain at least 8 characters")
+        if not any("a" <= char <= "z" for char in value):
+            raise ValueError(message_error)
+        if not any("A" <= char <= "Z" for char in value):
+            raise ValueError(message_error)
+        if not any("0" <= char <= "9" for char in value):
+            raise ValueError(message_error)
+        return value
 
     @model_validator(mode="after")
     def check_passwords(self):
@@ -39,6 +52,10 @@ class UserCreate(BaseModel):
             return self
         else:
             raise ValueError("Пароли не совпадают") 
+
+class UserLogin(BaseModel):
+    email: EmailStr
+    password: str
 
 app = FastAPI()
 
@@ -205,3 +222,19 @@ def create_user(user: UserCreate):
     except UniqueViolation:
         connection.rollback()
         raise HTTPException(status_code=409, detail="username or email already exists")
+
+@app.post("/auth/login")
+def login_user(user: UserLogin):
+    cursor = connection.cursor()
+    cursor.execute(
+        "SELECT id, username, email, password_hash "
+        "FROM users "
+        "WHERE email = %s",
+        (user.email,)
+    )
+    result = cursor.fetchone()
+    if result is None:
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+    if not password_hash.verify(user.password, result[3]):
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+    return {"message": "login successful", "user_id": result[0], "username": result[1], "email": result[2]}
